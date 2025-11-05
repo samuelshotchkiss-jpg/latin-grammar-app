@@ -75,21 +75,42 @@ document.addEventListener('DOMContentLoaded', () => {
             if (wordState.status === 'incorrect') wordEl.classList.add('incorrect');
         });
     }
-    function updateCounters() {
+   function updateCounters() {
         const state = appState[currentPOS];
         if (!state.isAnswered) {
             [scoreCounter, incorrectCounter, trialCounter].forEach(el => el.classList.add('hidden'));
             return;
         }
         [scoreCounter, incorrectCounter, trialCounter].forEach(el => el.classList.remove('hidden'));
+        
         const selectedWordsData = [];
         state.wordStatus.forEach((wordState, index) => { if (wordState.selected) selectedWordsData.push(storyData[index]); });
+
         const correctSelectedItems = selectedWordsData.filter(item => item.pos && (Array.isArray(item.pos) ? item.pos.includes(currentPOS) : item.pos === currentPOS));
-        const incorrectSelectedItems = selectedWordsData.filter(item => !item.pos || !(Array.isArray(item.pos) ? item.pos.includes(currentPOS) : item.pos === currentPOS));
         const simpleCorrect = correctSelectedItems.filter(item => !item.compositeVerb).length;
         const compositeCorrectIds = new Set(correctSelectedItems.filter(item => item.compositeVerb).map(item => item.compositeVerb));
         const correctSelectedCount = simpleCorrect + compositeCorrectIds.size;
-        const incorrectSelectedCount = incorrectSelectedItems.length;
+
+        // --- THIS IS THE CORRECTED LOGIC ---
+        
+        // 1. Declare the variable ONCE with `let`.
+        let incorrectSelectedCount = 0;
+
+        if (state.isAttempting) {
+            // While attempting, ONLY count words that have already been graded as incorrect.
+            state.wordStatus.forEach((wordState) => {
+                if (wordState.selected && wordState.status === 'incorrect') {
+                    incorrectSelectedCount++;
+                }
+            });
+        } else {
+            // After checking, count all newly selected incorrect items.
+            // 2. ASSIGN to the existing variable, do not redeclare with `const`.
+            const incorrectSelectedItems = selectedWordsData.filter(item => !item.pos || !(Array.isArray(item.pos) ? item.pos.includes(currentPOS) : item.pos === currentPOS));
+            incorrectSelectedCount = incorrectSelectedItems.length;
+        }
+        // --- END OF CORRECTION ---
+
         scoreLabel.textContent = state.isAttempting ? "Selected" : "Correct";
         scoreValue.innerHTML = `<span class="${state.isAttempting ? 'provisional-score' : ''}">${correctSelectedCount}</span> / ${state.totalPossible}`;
         incorrectCounter.textContent = `Incorrect: ${incorrectSelectedCount}`;
@@ -168,20 +189,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     function removeAllSpeechBubbles() { document.querySelectorAll('.speech-bubble').forEach(bubble => bubble.remove()); }
-    function showSpeechBubble(anchorElement, message) {
+
+    function displayTooltips(tooltipQueue) {
         removeAllSpeechBubbles();
-        const bubble = document.createElement('div');
-        bubble.className = 'speech-bubble';
-        bubble.innerHTML = message;
-        bubble.addEventListener('click', () => bubble.remove());
-        anchorElement.appendChild(bubble);
-        setTimeout(() => {
-            const bubbleRect = bubble.getBoundingClientRect();
-            const viewportWidth = window.innerWidth;
-            if (bubbleRect.right > viewportWidth - 10) { bubble.classList.add('align-right'); }
-            if (bubbleRect.left < 10) { bubble.classList.add('align-left'); }
-        }, 0);
+        if (tooltipQueue.length === 0) return;
+
+        const renderedBubbles = [];
+
+        // First pass: create all bubbles and get their initial info
+        tooltipQueue.forEach(info => {
+            const bubble = document.createElement('div');
+            bubble.className = 'speech-bubble';
+            bubble.innerHTML = info.message;
+            bubble.addEventListener('click', () => bubble.remove());
+            info.anchor.appendChild(bubble);
+            renderedBubbles.push({ element: bubble, rect: bubble.getBoundingClientRect() });
+        });
+
+        // Second pass: de-collision
+        for (let i = 0; i < renderedBubbles.length; i++) {
+            for (let j = 0; j < i; j++) {
+                const bubbleA = renderedBubbles[i];
+                const bubbleB = renderedBubbles[j];
+                const rectA = bubbleA.rect;
+                const rectB = bubbleB.rect;
+
+                // Check for horizontal overlap
+                if (rectA.left < rectB.right && rectA.right > rectB.left) {
+                    // If they overlap, flip the current bubble to be below
+                    bubbleA.element.classList.add('below');
+                    // Update its rect for subsequent checks, though this simple model doesn't need it
+                    bubbleA.rect = bubbleA.element.getBoundingClientRect();
+                    break; // Move to the next bubble
+                }
+            }
+        }
+
+        // Third pass: viewport alignment and making visible
+        const viewportWidth = window.innerWidth;
+        renderedBubbles.forEach(bubbleInfo => {
+            const { element, rect } = bubbleInfo;
+            if (rect.right > viewportWidth - 10) element.classList.add('align-right');
+            if (rect.left < 10) element.classList.add('align-left');
+            element.classList.add('visible');
+        });
     }
+
     function showCompletionMessage(attempts, incorrectSelectionsOnFinalAttempt, totalPossible) {
         let type, title, text;
         if (incorrectSelectionsOnFinalAttempt >= totalPossible && incorrectSelectionsOnFinalAttempt > 5) {
@@ -213,39 +266,46 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.isComplete) return;
         state.isAttempting = false;
         state.isAnswered = true;
-        removeAllSpeechBubbles();
+        
         let incorrectCount = 0;
-        let tooltipInfo = null;
+        const tooltipsToShow = []; // The queue for our new system
+
         state.wordStatus.forEach((wordState, index) => {
             if (wordState.selected) {
                 const wordData = storyData[index];
                 const isTargetPOS = wordData.pos && (Array.isArray(wordData.pos) ? wordData.pos.includes(currentPOS) : wordData.pos === currentPOS);
-                if (isTargetPOS) { wordState.status = 'correct'; } 
-                else { wordState.status = 'incorrect'; incorrectCount++; }
-            }
-        });
-        for (let i = 0; i < state.wordStatus.length; i++) {
-            const wordState = state.wordStatus[i];
-            if (wordState.selected && !wordState.tooltipShown) {
-                const wordData = storyData[i];
-                if (wordData.feedback && typeof wordData.feedback[currentPOS] !== 'undefined') {
+                
+                if (isTargetPOS) { 
+                    wordState.status = 'correct'; 
+                } else { 
+                    wordState.status = 'incorrect'; 
+                    incorrectCount++; 
+                }
+
+                // Check for tooltips regardless of correct/incorrect status
+                if (!wordState.tooltipShown && wordData.feedback && typeof wordData.feedback[currentPOS] !== 'undefined') {
                     const message = wordData.feedback[currentPOS];
-                    const wordEl = document.querySelector(`.word[data-word-index="${i}"]`);
-                    if (message) { tooltipInfo = { anchor: wordEl.parentElement, message: message }; }
-                    wordState.tooltipShown = true;
-                    break;
+                    if (message) { // Only queue if there's a message
+                        const wordEl = document.querySelector(`.word[data-word-index="${index}"]`);
+                        tooltipsToShow.push({ anchor: wordEl.parentElement, message: message });
+                    }
+                    wordState.tooltipShown = true; // Mark as handled
                 }
             }
-        }
-        if (tooltipInfo) { showSpeechBubble(tooltipInfo.anchor, tooltipInfo.message); }
+        });
+        
+        displayTooltips(tooltipsToShow); // NEW: Call the master tooltip function
+
         const correctItems = storyData.filter((item, index) => state.wordStatus[index].status === 'correct' && (Array.isArray(item.pos) ? item.pos.includes(currentPOS) : item.pos === currentPOS));
         const simpleCorrect = correctItems.filter(item => !item.compositeVerb).length;
         const compositeCorrectIds = new Set(correctItems.filter(item => item.compositeVerb).map(item => item.compositeVerb));
         const totalCorrectUnits = simpleCorrect + compositeCorrectIds.size;
+        
         if (totalCorrectUnits === state.totalPossible) {
             state.isComplete = true;
             showCompletionMessage(state.attempts, incorrectCount, state.totalPossible);
         }
+
         saveState(currentPOS);
         renderUI();
     }
@@ -273,8 +333,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const clickedEl = e.target;
                     const clickedIndex = parseInt(clickedEl.dataset.wordIndex, 10);
                     const state = appState[currentPOS];
-                    if (state.isComplete || state.wordStatus[clickedIndex].status === 'incorrect') return;
-                    if (!state.isAttempting) {
+                        if (state.isComplete || state.wordStatus[clickedIndex].status === 'incorrect' || state.wordStatus[clickedIndex].status === 'correct') return;                   
+                        if (!state.isAttempting) {
                         state.isAttempting = true;
                         state.attempts++;
                     }
@@ -295,15 +355,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             wordContainer.appendChild(span);
             currentParagraph.appendChild(wordContainer);
-            
-            // --- THIS IS THE UPDATED SPACING LOGIC ---
             const nextItem = storyData[index + 1];
-            // Add a space UNLESS the current item is marked `noSpaceAfter` OR the next item is punctuation.
             if (!item.noSpaceAfter && nextItem && nextItem.pos !== 'Punctuation') {
                 currentParagraph.appendChild(document.createTextNode(' '));
             }
         });
-        // This second pass for sentence wrapping is safer and correct.
         textContainer.querySelectorAll('p').forEach(p => {
             let sentenceContent = [];
             const children = Array.from(p.childNodes);
