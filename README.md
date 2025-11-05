@@ -27,6 +27,7 @@ A standard word with a single part of speech.
 
 ```json
 { "word": "rēx", "pos": "Noun" }
+```
 
 ### Example 2: Composite Verb
 
@@ -35,6 +36,7 @@ expulsus est is a single verb. Both parts share compositeVerb: "verb3". The feed
 ```json
 { "word": "expulsus", "pos": "Verb", "compositeVerb": "verb3" },
 { "word": "est", "pos": "Verb", "compositeVerb": "verb3" }
+```
 
 ### Example 3: Dual-Nature Participle
 dolēns can be both a verb and an adjective. Its pos is an array. The feedback messages are keyed to the student's correct guess.
@@ -48,6 +50,7 @@ dolēns can be both a verb and an adjective. Its pos is an array. The feedback m
         "Adjective": "That's it! 'dolēns' is a participle. As an adjective, it modifies 'Brūtus'. As a verb, it describes action ('grieving')."
     }
 }
+```
 
 ### Example 4: Complex Feedback ("Superbus")
 Superbus is a noun. We provide specific feedback if the student correctly identifies it, if they make a reasonable mistake ("Adjective"), or no feedback at all for an unlikely guess ("Verb").
@@ -62,6 +65,7 @@ Superbus is a noun. We provide specific feedback if the student correctly identi
         "Verb": ""
     }
 }
+```
 
 ## IV. Instructions for LLM
 
