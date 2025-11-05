@@ -1,12 +1,24 @@
-# Latin Grammar Practice App: data.json Specification
+# Latin Grammar Practice App: Content File Specification
 
-This document outlines the required format for the `data.json` file used by the Latin Grammar Practice application. The purpose is to provide a clear specification for a human or an LLM to process a new Latin text and generate a valid `data.json` file.
+This document outlines the required format for the JSON content files used by the Latin Grammar Practice application. The purpose is to provide a clear specification for a human or an LLM to process a new Latin text and generate a valid JSON file.
 
-## I. Overall Structure
+## I. Multi-Text Functionality
 
-The `data.json` file is a single JSON array `[]`. Each element in the array is an object `{}` that represents a single word, a piece of punctuation, or a paragraph break.
+The application is designed to load different Latin texts. This is controlled via a URL parameter.
 
-## II. Object Properties (The Schema)
+-   If no parameter is provided, the app will load the default `data.json` file.
+    -   `.../index.html` -> loads `data.json`
+-   If a `?text=` parameter is in the URL, the app will load the corresponding `.json` file.
+    -   `.../index.html?text=dbg1c4-5` -> loads `dbg1c4-5.json`
+    -   `.../index.html?text=ovid` -> loads `ovid.json`
+
+This specification applies to `data.json` and any other text file you create.
+
+## II. Overall Structure
+
+Each content file (e.g., `data.json`, `dbg1c4-5.json`) is a single JSON array `[]`. Each element in the array is an object `{}` that represents a single word, a piece of punctuation, or a paragraph break.
+
+## III. Object Properties (The Schema)
 
 Each object in the array can have the following properties:
 
@@ -19,19 +31,17 @@ Each object in the array can have the following properties:
 | `feedback`      | `object`                      | Optional  | An object containing context-specific tooltips. The **keys** are the part of speech the student guessed (`"Noun"`, `"Verb"`, `"Adjective"`). The **values** are the message strings. To show no message for a specific guess, use an empty string `""`. |
 | `noSpaceAfter`  | `boolean`                     | Optional  | Used for words that are visually attached to the following word, such as the host word for an enclitic (e.g., `-que`). Set to `true` to prevent a space from being rendered after the word. |
 
-## III. Examples
+## IV. Examples
 
-Here are examples from the current text that demonstrate the schema in practice.
+Here are examples that demonstrate the schema in practice.
 
 #### Example 1: Simple Noun
-A standard word with a single part of speech.
 
 ```json
 { "word": "rēx", "pos": "Noun" }
 ```
 
 #### Example 2: Composite Verb
-`expulsus est` is a single verb. Both parts share `compositeVerb: "verb3"`.
 
 ```json
 { "word": "expulsus", "pos": "Verb", "compositeVerb": "verb3" },
@@ -39,7 +49,6 @@ A standard word with a single part of speech.
 ```
 
 #### Example 3: Dual-Nature Participle
-`dolēns` can be both a verb and an adjective. Its `pos` is an array. The feedback messages are keyed to the student's correct guess.
 
 ```json
 {
@@ -52,8 +61,7 @@ A standard word with a single part of speech.
 }
 ```
 
-#### Example 4: Complex Feedback ("Superbus")
-`Superbus` is a noun. We provide specific feedback if the student correctly identifies it, if they make a reasonable mistake ("Adjective"), or no feedback at all for an unlikely guess ("Verb").
+#### Example 4: Complex Feedback
 
 ```json
 {
@@ -68,16 +76,25 @@ A standard word with a single part of speech.
 ```
 
 #### Example 5: Enclitic Handling
-The word `obaerātōsque` is split into two separate items. The first item, `obaerātōs`, receives the `noSpaceAfter: true` flag to ensure it renders correctly without a space before `-que`.
 
 ```json
 { "word": "obaerātōs", "pos": "Noun", "noSpaceAfter": true },
 { "word": "que", "pos": "Conjunction" }
 ```
 
-## IV. Instructions for LLM
+## V. Instructions for LLM
 
-**Prompt:**
+**Prompt Template:**
 ```
-Here is a Latin text. Please process it into a `data.json` file according to the provided specification and examples. Tag every word by its part of speech (`pos`). For words that are parts of a composite verb (like the perfect passive system), assign them a shared, unique `compositeVerb` ID. For words with grammatical ambiguity or common points of confusion, add a `feedback` object with helpful, context-specific messages for students. Ensure paragraph breaks are marked with `{ "type": "break" }`. Pay close attention to dual-nature words like participles and gerundives, listing their `pos` in an array. Handle enclitics like `-que` by splitting them from their host word into a separate object and adding the `"noSpaceAfter": true` property to the host word object.
-```
+Please process the following Latin text into a JSON file named `[filename].json` according to the provided specification and examples.
+
+**Specification Highlights:**
+- Tag every word by its part of speech (`pos`).
+- For multi-word verbs (like the perfect passive system), assign a shared, unique `compositeVerb` ID.
+- For words with grammatical ambiguity, add a `feedback` object with helpful, context-specific messages.
+- Mark paragraph breaks with `{ "type": "break" }`.
+- For dual-nature words like participles, list their `pos` in an array (e.g., `["Verb", "Adjective"]`).
+- Handle enclitics like `-que` by splitting them from their host word into a separate object and adding the `"noSpaceAfter": true` property to the host word object.
+
+**Latin Text:**
+[PASTE LATIN TEXT HERE]
