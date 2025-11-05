@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Latin Grammar Practice</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="app-container">
+        <header>
+            <h1>Latin Grammar Practice</h1>
+            <div id="header-controls">
+                <button id="reset-button" title="Reset all progress for all categories">Reset All Progress</button>
+                <div id="counters">
+                    <div id="score-counter" class="hidden">
+                        <span id="score-label">Correct</span>: <span id="score-value">0 / 0</span>
+                    </div>
+                    <div id="incorrect-counter" class="hidden">Incorrect: 0</div>
+                    <div id="trial-counter" class="hidden">Attempts: 0</div>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <div id="completion-message" class="hidden">
+                <h3 id="completion-title"></h3>
+                <p id="completion-text"></p>
+                <button id="completion-close-button">OK</button>
+            </div>
+
+            <div id="question-area">
+                <h2 id="question-prompt">Loading...</h2>
+                <div id="controls">
+                    <div id="question-selector">
+                        <span>Select a category:</span>
+                        <button data-pos="Noun">Nouns <span class="completion-check"></span></button>
+                        <button data-pos="Verb">Verbs <span class="completion-check"></span></button>
+                        <button data-pos="Adjective">Adjectives <span class="completion-check"></span></button>
+                    </div>
+                    <button id="finish-button">Check Answers</button>
+                </div>
+            </div>
+            <div id="text-container">
+                <!-- Latin text will be dynamically inserted here -->
+            </div>
+
+            <!-- NEW HINTS SECTION -->
+            <div id="hints-container" class="hidden">
+                <h3>Hints</h3>
+                <div class="hint-checkbox-wrapper" id="hint1-wrapper" data-tooltip="Unlock at 50% completion">
+                    <input type="checkbox" id="hint1" disabled>
+                    <label for="hint1">Show words from other categories</label>
+                    <div class="color-key">
+                        <span class="color-box hint-noun"></span> Noun/Pronoun
+                        <span class="color-box hint-verb"></span> Verb
+                        <span class="color-box hint-adjective"></span> Adjective
+                    </div>
+                </div>
+                <div class="hint-checkbox-wrapper" id="hint2-wrapper" data-tooltip="Unlock at 75% completion">
+                    <input type="checkbox" id="hint2" disabled>
+                    <label for="hint2">Highlight sentences with missing words</label>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
