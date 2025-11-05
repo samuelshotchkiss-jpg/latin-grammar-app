@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const POS_CATEGORIES = ['Noun', 'Verb', 'Adjective'];
     let appState = {};
     let currentPOS = 'Noun';
+    let currentTextName = 'default_story';
 
     // --- STATE MANAGEMENT ---
     function createInitialState(pos) {
@@ -38,15 +39,18 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
     function loadState(pos) {
-        const savedState = localStorage.getItem(`latinAppProgress_${pos}`);
+        const key = `latinAppProgress_${currentTextName}_${pos}`;
+        const savedState = localStorage.getItem(key);
         appState[pos] = savedState ? JSON.parse(savedState) : createInitialState(pos);
     }
-    function saveState(pos) { localStorage.setItem(`latinAppProgress_${pos}`, JSON.stringify(appState[pos])); }
+    function saveState(pos) {
+        const key = `latinAppProgress_${currentTextName}_${pos}`;
+        localStorage.setItem(key, JSON.stringify(appState[pos]));
+    }
     function resetAllProgress() {
         if (confirm("Are you sure you want to reset all progress for all categories? This cannot be undone.")) {
             localStorage.clear();
-            POS_CATEGORIES.forEach(pos => appState[pos] = createInitialState(pos));
-            switchQuestionTab(currentPOS);
+            initializeApp();
         }
     }
 
@@ -164,29 +168,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     function removeAllSpeechBubbles() { document.querySelectorAll('.speech-bubble').forEach(bubble => bubble.remove()); }
-function showSpeechBubble(anchorElement, message) {
+    function showSpeechBubble(anchorElement, message) {
         removeAllSpeechBubbles();
         const bubble = document.createElement('div');
         bubble.className = 'speech-bubble';
         bubble.innerHTML = message;
         bubble.addEventListener('click', () => bubble.remove());
         anchorElement.appendChild(bubble);
-
-        // Use a timeout to ensure the element has been rendered by the browser
-        // before we try to measure its position. A 0ms delay is enough.
         setTimeout(() => {
             const bubbleRect = bubble.getBoundingClientRect();
             const viewportWidth = window.innerWidth;
-
-            // Check if it overflows on the right
-            if (bubbleRect.right > viewportWidth - 10) { // Add a 10px buffer
-                bubble.classList.add('align-right');
-            }
-            
-            // Check if it overflows on the left
-            if (bubbleRect.left < 10) { // Add a 10px buffer
-                bubble.classList.add('align-left');
-            }
+            if (bubbleRect.right > viewportWidth - 10) { bubble.classList.add('align-right'); }
+            if (bubbleRect.left < 10) { bubble.classList.add('align-left'); }
         }, 0);
     }
     function showCompletionMessage(attempts, incorrectSelectionsOnFinalAttempt, totalPossible) {
@@ -262,21 +255,16 @@ function showSpeechBubble(anchorElement, message) {
         textContainer.innerHTML = '';
         let currentParagraph = document.createElement('p');
         textContainer.appendChild(currentParagraph);
-
         storyData.forEach((item, index) => {
-            // A. Handle paragraph breaks first. This is a simple, safe case.
             if (item.type === 'break') {
                 currentParagraph = document.createElement('p');
                 textContainer.appendChild(currentParagraph);
-                return; // Go to the next item
+                return;
             }
-
-            // B. Create the word/punctuation element.
             const wordContainer = document.createElement('span');
             wordContainer.className = 'word-container';
             const span = document.createElement('span');
             span.textContent = item.word;
-
             if (item.pos && item.pos !== 'Punctuation') {
                 span.classList.add('word');
                 span.dataset.wordIndex = index;
@@ -305,32 +293,23 @@ function showSpeechBubble(anchorElement, message) {
             } else {
                 span.classList.add('punctuation');
             }
-            
-            // C. Append the word and a space to the current paragraph.
             wordContainer.appendChild(span);
             currentParagraph.appendChild(wordContainer);
-// --- REPLACE THE SINGLE LINE ABOVE WITH THIS BLOCK ---
-
-// Add a space after the word container UNLESS the next item is punctuation.
-const nextItem = storyData[index + 1];
-if (nextItem && nextItem.pos !== 'Punctuation') {
-    currentParagraph.appendChild(document.createTextNode(' '));
-}
-// --- END OF BLOCK TO REPLACE WITH ---
+            
+            // --- THIS IS THE UPDATED SPACING LOGIC ---
+            const nextItem = storyData[index + 1];
+            // Add a space UNLESS the current item is marked `noSpaceAfter` OR the next item is punctuation.
+            if (!item.noSpaceAfter && nextItem && nextItem.pos !== 'Punctuation') {
+                currentParagraph.appendChild(document.createTextNode(' '));
+            }
         });
-
-        // D. After building, go back and wrap sentences.
-        // This is much safer as all elements are already on the page.
+        // This second pass for sentence wrapping is safer and correct.
         textContainer.querySelectorAll('p').forEach(p => {
             let sentenceContent = [];
-            // NodeList needs to be converted to a real array for manipulation
             const children = Array.from(p.childNodes);
-
             children.forEach(child => {
                 sentenceContent.push(child);
-                // Check if the node is punctuation that ends a sentence.
                 const isSentenceEnd = (child.nodeType === Node.ELEMENT_NODE && child.querySelector('.punctuation') && (child.textContent.includes('.') || child.textContent.includes('!') || child.textContent.includes('?')));
-                
                 if (isSentenceEnd) {
                     const sentenceSpan = document.createElement('span');
                     sentenceSpan.className = 'sentence';
@@ -339,8 +318,6 @@ if (nextItem && nextItem.pos !== 'Punctuation') {
                     sentenceContent = [];
                 }
             });
-
-            // If there's any content left over (for paragraphs with no ending punctuation), wrap it.
             if (sentenceContent.length > 0) {
                 const sentenceSpan = document.createElement('span');
                 sentenceSpan.className = 'sentence';
@@ -352,14 +329,25 @@ if (nextItem && nextItem.pos !== 'Punctuation') {
 
     async function initializeApp() {
         try {
-            const response = await fetch('data.json');
+            const urlParams = new URLSearchParams(window.location.search);
+            const textIdentifier = urlParams.get('text');
+            let fileName;
+            if (textIdentifier) {
+                currentTextName = textIdentifier;
+                fileName = `${textIdentifier}.json`;
+            } else {
+                currentTextName = 'default_story';
+                fileName = 'data.json';
+            }
+            const response = await fetch(fileName);
+            if (!response.ok) { throw new Error(`Could not load file: ${fileName}`); }
             storyData = await response.json();
             buildTextDOM();
             POS_CATEGORIES.forEach(pos => loadState(pos));
             switchQuestionTab(currentPOS);
         } catch (error) {
             console.error("FATAL ERROR during initialization:", error);
-            textContainer.innerHTML = "<p>Error: Could not load data. Check console for details.</p>";
+            textContainer.innerHTML = "<p style='color:red;'><b>Error:</b> Could not load story data. Check console for details.</p>";
         }
     }
 

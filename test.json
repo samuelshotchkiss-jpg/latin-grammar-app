@@ -1,0 +1,10 @@
+[
+    { "word": "Gallia", "pos": "Noun" },
+    { "word": "est", "pos": "Verb", "compositeVerb": "testverb1" },
+    { "word": "omnis", "pos": "Adjective", "feedback": { "Noun": "Close! Because 'omnis' describes 'Gallia' (all of Gaul), it's acting as an adjective here." } },
+    { "word": "divisa", "pos": "Verb", "compositeVerb": "testverb1" },
+    { "word": "in", "pos": "Preposition" },
+    { "word": "partes", "pos": "Noun" },
+    { "word": "tres", "pos": "Adjective" },
+    { "word": ".", "pos": "Punctuation" }
+]
